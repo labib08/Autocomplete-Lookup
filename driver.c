@@ -246,13 +246,32 @@ void arrayEnsureSize(array_t *arr) {
 	}
 }
 
-
+/**
 void arrayAppend(array_t *arr, cafe_t *c) {
     int i = arr->n - 1;
     arrayEnsureSize(arr);
 
     // Find the correct position to insert the new element based on trad_name
     while (i >= 0 && strcmp(arr->A[i]->trad_name, c->trad_name) > 0) {
+        arr->A[i + 1] = arr->A[i];
+        i--;
+    }
+
+    // Insert the new element in the correct position
+    arr->A[i + 1] = c;
+    (arr->n)++;
+}
+*/
+void arrayAppend(array_t *arr, cafe_t *c) {
+    int i = arr->n - 1;
+    arrayEnsureSize(arr);
+
+    // Find the correct position to insert the new element based on trad_name and seating type
+    while (i >= 0 &&
+           (strcmp(arr->A[i]->trad_name, c->trad_name) > 0 ||
+            (strcmp(arr->A[i]->trad_name, c->trad_name) == 0 &&
+             strcmp(arr->A[i]->seat_type, c->seat_type) > 0))) {
+
         arr->A[i + 1] = arr->A[i];
         i--;
     }

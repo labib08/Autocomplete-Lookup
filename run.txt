@@ -8,5 +8,5 @@ make -B dict2
 
 ./dict2 2 tests/dataset_20.csv output.out < tests/test20.in > output.stdout.out
 
-./dict2 2 tests/dataset_1000.csv output.out < tests/test1000.in > output.stdout.out
+./dict2 2 tests/dataset_100.csv output.out < tests/test100.in > output.stdout.out
 
