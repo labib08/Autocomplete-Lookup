@@ -9,6 +9,7 @@
 #define PADDING 'x'
 #define LEFT 0
 #define RIGHT 1
+#define COUNT 10
 
 typedef struct cafe cafe_t;
 struct cafe {
@@ -59,17 +60,29 @@ int compareBitPrefix(char *incomingBit, char *existingBit, int incomingInt, int 
 radix_t *createBranchNode();
 void adjustNodeBranch(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexSame);
 void printPreorder(radix_t *root);
-void changePrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming);
+void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming);
+void changePrefixBit(radix_t *incoming, int *indexIncoming);
 int decideBranch(radix_t *incoming, int indexSame);
 void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame);
+int bitToInt(char bit);
+void insertNode(radix_t *parent, radix_t *child, radix_t *branchNode);
+void print2DUtil(radix_t* root, int space);
+void print2D(radix_t* root);
+void cleanupRadixTree(radix_t *root);
 
 int main(int argc, char *argv[]){
     FILE *inFile = fopen(argv[2], "r");
     assert(inFile);
     root_t *rootNode = getRoot(inFile);
-    printPreorder(rootNode -> head);
+    //printPreorder(rootNode -> head);
+    //print2D(rootNode -> head);
     //printf("%p", rootNode->head);
     //printf("Integer == %d\nPrefix == %s\nBit_Prefix == %s\nbranchA == %p\nbranchB == %p\ncafe == %p\n", rootNode->head->integer, rootNode->head->prefix, rootNode->head->bit_prefix, rootNode->head->branchA, rootNode->head->branchB, rootNode->head->data);
+    fclose(inFile);  // Close the input file after reading data
+
+    // Clean up memory
+    cleanupRadixTree(rootNode->head);
+    free(rootNode);
     return 0;
 }
 
@@ -145,7 +158,7 @@ void cafeRead(FILE *f, root_t *rootNode) {
 }
 
 void insert(root_t *rootNode, radix_t *radixNode){
-    radix_t *temp = rootNode -> head;
+    //radix_t *temp = rootNode -> head;
     //radix_t *childTemp = NULL;
 
     if (rootNode->head == NULL){
@@ -153,106 +166,123 @@ void insert(root_t *rootNode, radix_t *radixNode){
         rootNode -> parent = rootNode -> head;
     }
     else{
-        int indexSame, indexStart = 0;
-        insertRecursively(&(rootNode->head), radixNode, indexSame);
-        //printf("%s\n", temp -> bit_prefix);
-        /**
         int indexSame = 0;
-
-        int isSame = compareBitPrefix(radixNode -> bit_prefix, temp -> bit_prefix, radixNode -> integer, temp -> integer,
-                                        &indexSame);
-
-
-        if (!isSame) {
-            radix_t *branchNode = createBranchNode();
-            changePrefixBit(radixNode, temp, branchNode, indexSame);
-            //printf("%s\n", radixNode -> bit_prefix);
-
-            adjustNodeBranch(radixNode, temp, branchNode, indexSame);
-
-            if (rootNode -> parent == rootNode -> head) {
-                rootNode -> head = branchNode;
-            }
-            //printf("Integer == %d\nPrefix == %p\nBit_Preix == %s\nbranchA == %p\nbranchB == %p\ncafe == %p\n", branchNode->integer, branchNode->prefix, branchNode->bit_prefix, branchNode->branchA, branchNode->branchB, branchNode->data);
-        }
-        else{
-            if (decideBranch(radixNode, isSame)){
-
-            }
-        }
-        */
+        insertRecursively(&(rootNode->head), radixNode, indexSame);
     }
-    //printf("Integer == %d\nPrefix == %s\nBit_Preix == %s\nbranchA == %p\nbranchB == %p\ncafe == %s\n", radixNode->integer, radixNode->prefix, radixNode->bit_prefix, radixNode->branchA, radixNode->branchB, radixNode->data->trad_name);
-    //printf("************\n");
-
 }
 
 void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame) {
     radix_t *temp = *head;
 
-
+    //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
     int isSame = compareBitPrefix(radixNode->bit_prefix, temp->bit_prefix, radixNode->integer, temp->integer,
                                   &indexSame);
-
+    //printf("%d\n", isSame);
+    //printf("%d\n", indexSame);
+    //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
     if (!isSame) {
         radix_t *branchNode = createBranchNode();
-        changePrefixBit(radixNode, temp, branchNode, indexSame);
+        //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
+        changeBranchPrefixBit(radixNode, temp, branchNode, indexSame);
+        //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
+        //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
+        //printf("%d\n", indexSame);
+        //printf("BranchNode = %s\n", branchNode->bit_prefix);
         if (temp -> parentBranch == NULL){
             *head = branchNode;
         }
         else{
-            branchNode = temp -> parentBranch;
+            //printf("%d\n", temp -> parentBranch->branchB == temp);
+            insertNode(temp -> parentBranch, temp, branchNode);
+
         }
         adjustNodeBranch(radixNode, temp, branchNode, indexSame);
-
-        /**
-        if (temp == *head) {
-            *head = branchNode; // Update the head pointer
-        }
-        else{
-
-        }
-        */
+        //printf("BranchNode = %s\n", branchNode->bit_prefix);
     } else {
-        if (decideBranch(radixNode, isSame)) {
+        //printf("index1 == %d\n", indexSame);
+        //printf("Same Branch: %s and \n", radixNode->bit_prefix);
+        //printf("Same Branch: %s and %s\n", radixNode->prefix, radixNode->bit_prefix);
+        changePrefixBit(radixNode, &indexSame);
+        //printf("index2 == %d\n", indexSame);
+        //printf("--------\n");
+       //printf("Same Branch: %s and %s\n", radixNode->prefix, radixNode->bit_prefix);
+        if (decideBranch(radixNode, indexSame) == RIGHT) {
+            //printf("%s\n", radixNode->bit_prefix);
+            insertRecursively(&((*head)->branchB), radixNode, indexSame);
 
+        }
+         else if (decideBranch(radixNode, indexSame) == LEFT){
+            //printf("%s\n", radixNode->prefix);
+            insertRecursively(&((*head)->branchA), radixNode, indexSame);
         }
     }
 }
+
+void insertNode(radix_t *parent, radix_t *child, radix_t *branchNode){
+    if (parent -> branchA == child) {
+        parent -> branchA = branchNode;
+    }
+    else if (parent -> branchB == child) {
+        parent -> branchB = branchNode;
+    }
+    branchNode -> parentBranch = parent;
+}
+
 int decideBranch(radix_t *incoming, int indexSame) {
-    if (incoming -> bit_prefix[indexSame] == RIGHT){
+    int bitValue = bitToInt(incoming->bit_prefix[indexSame]);
+    //printf("%d\n", indexSame);
+    if (bitValue == RIGHT){
         return RIGHT;
     }
     return LEFT;
 }
 
 void adjustNodeBranch(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexSame) {
+    assert(incoming && existing &&branchNode);
+    int bitValue = bitToInt(incoming->bit_prefix[indexSame]);
+    if (bitValue == LEFT){
 
-    if (incoming -> bit_prefix [indexSame] == LEFT){
         branchNode -> branchA = incoming;
         branchNode -> branchB = existing;
+
     }
-    else {
+    else if (bitValue == RIGHT){
         branchNode -> branchA = existing;
         branchNode -> branchB = incoming;
     }
     incoming -> parentBranch = existing -> parentBranch = branchNode;
 }
 
-void changePrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming) {
-    int n = 0;
+void changePrefixBit(radix_t *incoming, int *indexIncoming){
+    assert(incoming);
+    int n = *indexIncoming;
 
+   // printf("%d == %s\n", *indexIncoming, incoming->prefix);
+    for (int i=0; i< n; i++){
+        incoming -> bit_prefix[i] = PADDING;
+        *indexIncoming = i + 1;
+    }
+}
+
+void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming) {
+    assert(incoming && existing &&branchNode);
+    int n = 0;
     char *incomingBit = incoming -> bit_prefix;
     char *existingBit = existing -> bit_prefix;
 
-    int totalIndex = incoming -> integer;
+    int index1 = strlen(incoming -> bit_prefix);
+    int index2 = strlen(existing -> bit_prefix);
 
-    if (existing -> integer < incoming -> integer){
-        totalIndex = existing -> integer;
+    int totalIndex = index1;
+    //printf("strlen == %lu", strlen(incoming->bit_prefix));
+    //printf("TotalIndex == %d\n", totalIndex);
+    //printf("Index Incoming == %d\n", indexIncoming);
+    if (index2< index1){
+        totalIndex = index2;
     }
 
     char *binaryString = (char*)malloc(totalIndex);
-
+    //printf("TotalIndex == %d\n", totalIndex);
     while (n != indexIncoming){
         binaryString[n] = incomingBit[n];
         incomingBit[n] = PADDING;
@@ -268,27 +298,31 @@ void changePrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, 
         binaryString[n] = PADDING;
         n++;
     }
-
+    //printf("%d\n", n);
     branchNode -> bit_prefix = binaryString;
-
 }
 
 int compareBitPrefix(char *incomingBit, char *existingBit, int incomingInt, int existingInt, int *indexIncoming){
     int flag = 1;
-
+    int i = 0;
     int n = incomingInt;
     if (existingInt < incomingInt){
         n = existingInt;
     }
-
-    for (int i = *indexIncoming; i < n; i++){
+    if (*indexIncoming < 0 || *indexIncoming >= n) {
+        // Handle the out-of-bounds case, e.g., return an error code
+        return -1;
+    }
+    //printf("indexIncoming == %d AND n == %d\n", *indexIncoming, *indexIncoming + n);
+    for (i = *indexIncoming; i < n; i++){
         if (existingBit[i] != incomingBit[i]){
             flag = 0;
-            *indexIncoming = i;
+
             break;
         }
     }
-
+    *indexIncoming = i;
+   // printf("%d == %s\n", *indexIncoming, incomingBit);
     return flag;
 }
 
@@ -403,6 +437,10 @@ cafe_t *createNode(){
     return node;
 }
 
+int bitToInt(char bit) {
+    return atoi(&bit); // Convert the character bit to an integer
+}
+
 void printPreorder(radix_t *root) {
     if (root == NULL)
         return;
@@ -415,4 +453,60 @@ void printPreorder(radix_t *root) {
 
     // Now recur on right subtree
     printPreorder(root->branchB);
+}
+
+void print2DUtil(radix_t* root, int space)
+{
+    // Base case
+    if (root == NULL)
+        return;
+
+    // Increase distance between levels
+    space += COUNT;
+
+    // Process right child first
+    print2DUtil(root->branchB, space);
+
+    // Print current node after space
+    // count
+    printf("\n");
+    for (int i = COUNT; i < space; i++){
+        printf(" ");
+    }
+
+    printf("%s\n", root->prefix);
+
+    // Process left child
+    print2DUtil(root->branchA, space);
+}
+
+void print2D(radix_t* root)
+{
+    // Pass initial space count as 0
+    print2DUtil(root, 0);
+}
+void cleanupRadixTree(radix_t *root) {
+    if (root == NULL) {
+        return;
+    }
+
+    // Recursively free left and right subtrees
+    cleanupRadixTree(root->branchA);
+    cleanupRadixTree(root->branchB);
+
+    // Free dynamically allocated fields
+    free(root->prefix);
+    free(root->bit_prefix);
+    free(root);
+
+    // Don't forget to free cafe data if it's dynamically allocated
+    if (root->data) {
+        free(root->data->build_add);
+        free(root->data->clue_small_area);
+        free(root->data->bus_area);
+        free(root->data->trad_name);
+        free(root->data->indus_desc);
+        free(root->data->seat_type);
+        free(root->data);
+    }
 }
