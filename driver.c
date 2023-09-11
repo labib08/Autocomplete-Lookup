@@ -48,7 +48,6 @@ void cafeRead(FILE *f, array_t *arr);
 cafe_t *createNode();
 void putInNode(cafe_t *new_node, char *lines, int wordCount);
 void arrayEnsureSize(array_t *arr);
-int tradNameCmp(const void *a, const void *b);
 int charCompFunc(char *trad_name, char *prefix, int prefix_length);
 void arrayAppend(array_t *arr, cafe_t *c);
 void findAndTraverse(array_t *cafes, char *prefix, FILE *f);
@@ -70,13 +69,7 @@ int main(int argc, char *argv[]){
     assert(inFile && outFile);
 
     array_t *cafes = getCafeArray(inFile);
-    //int j=0;
-    for (int i=0; i< cafes->n; i++){
-        //printf("%d, %d, %d, %d, %s, %s, %s, %s, %d, %s, %s, %d, %lf , %lf\n", cafes -> A[i] ->cen_year, cafes -> A[i] ->block_id, cafes -> A[i] ->prop_id, cafes -> A[i] ->base_prop_id, cafes -> A[i] ->build_add, cafes -> A[i] ->clue_small_area, cafes -> A[i] ->bus_area, cafes -> A[i] ->trad_name, cafes -> A[i] ->indus_code, cafes -> A[i] ->indus_desc, cafes -> A[i] ->seat_type, cafes -> A[i] ->num_of_seats, cafes -> A[i] ->longitude, cafes -> A[i] ->latitude);
-        //printf("************\n");
-        //printf("(%d) %s\n",j++, cafes->A[i]->trad_name);
-    }
-    //printf("************\n");
+
     int queryCount = 0;
     char **queries;
     int initialQuerySize = INIT_SIZE;
@@ -95,6 +88,7 @@ int main(int argc, char *argv[]){
     // Frees the queries array
     freeQueries(queries, queryCount);
     fclose(inFile);
+    fclose(outFile);
     return 0;
 
 }
@@ -232,12 +226,6 @@ void putInNode(cafe_t *new_node, char *lines, int wordCount){
     }
 }
 
-int tradNameCmp(const void *a, const void *b) {
-    const cafe_t *cafeA = *(const cafe_t **)a;
-    const cafe_t *cafeB = *(const cafe_t **)b;
-     return strcmp(cafeA->trad_name, cafeB->trad_name);
-}
-
 void arrayEnsureSize(array_t *arr) {
 	if (arr->n == arr->size) {
 		arr->size <<= 1;       // Same as arr->size *= 2;
@@ -246,31 +234,13 @@ void arrayEnsureSize(array_t *arr) {
 	}
 }
 
-/**
+
 void arrayAppend(array_t *arr, cafe_t *c) {
     int i = arr->n - 1;
     arrayEnsureSize(arr);
 
     // Find the correct position to insert the new element based on trad_name
     while (i >= 0 && strcmp(arr->A[i]->trad_name, c->trad_name) > 0) {
-        arr->A[i + 1] = arr->A[i];
-        i--;
-    }
-
-    // Insert the new element in the correct position
-    arr->A[i + 1] = c;
-    (arr->n)++;
-}
-*/
-void arrayAppend(array_t *arr, cafe_t *c) {
-    int i = arr->n - 1;
-    arrayEnsureSize(arr);
-
-    // Find the correct position to insert the new element based on trad_name and seating type
-    while (i >= 0 &&
-           (strcmp(arr->A[i]->trad_name, c->trad_name) > 0 ||
-            (strcmp(arr->A[i]->trad_name, c->trad_name) == 0 &&
-             strcmp(arr->A[i]->seat_type, c->seat_type) > 0))) {
 
         arr->A[i + 1] = arr->A[i];
         i--;
@@ -318,7 +288,7 @@ void findAndTraverse(array_t *cafes, char *prefix, FILE *f) {
     int prefix_length = strlen(prefix);
 
     int strComp = 0;
-    int charComp = 1;
+    int charComp = 0;
     int byteComp = 1;
 
     fprintf(f, "%s\n", prefix);
@@ -330,24 +300,33 @@ void findAndTraverse(array_t *cafes, char *prefix, FILE *f) {
         if (cmp == 0) {
             // Found a match, print the record and move towards the start
             int start = mid;
-
+            int endMark = start;
             while (start >=0){
-                //printf("%s\n", cafes->A[start]->trad_name);
+                int startMark = start;
                 strComp++;
                 charComp += charCompFunc(cafes->A[start]->trad_name, prefix, prefix_length);
                 if (strncmp(cafes->A[start]->trad_name, prefix, prefix_length) != 0) {
+                    while (startMark != endMark){
+                        printOutFile(f, cafes, startMark+1);
+                        startMark++;
+                    }
                     break;
                 }
 
-                printOutFile(f, cafes, start);
+
                 start--;
+                if (start == -1){
+                    while (startMark != endMark + 1){
+                        printOutFile(f, cafes, startMark);
+                        startMark++;
+                    }
+                }
+
             }
             // Move towards the end
             int end = mid + 1;
 
             while (end < cafes->n){
-
-                //printf("%s\n", cafes->A[end]->trad_name);
                 strComp++;
                 charComp += charCompFunc(cafes->A[end]->trad_name, prefix, prefix_length);
                 if ( strncmp(cafes->A[end]->trad_name, prefix, prefix_length) != 0){
@@ -356,6 +335,7 @@ void findAndTraverse(array_t *cafes, char *prefix, FILE *f) {
 
                 printOutFile(f, cafes, end);
                 end++;
+
             }
             break;
         }
@@ -386,16 +366,23 @@ void printOutFile(FILE *f, array_t *cafes, int ind){
         cafes->A[ind]->seat_type, cafes->A[ind]->num_of_seats, cafes->A[ind]->longitude,
         cafes->A[ind]->latitude);
 }
+
 int charCompFunc(char *trad_name, char *prefix, int prefix_length){
     int charComp =0;
+    int flag =1;
     for (int i=0; i< prefix_length; i++){
         charComp++;
         if (trad_name[i] != prefix[i]){
+            flag = 0;
             break;
         }
     }
+    if (flag){
+        charComp++;
+    }
     return charComp;
 }
+
 
 void freeCafes(array_t *arr){
      for (int i = 0; i < arr->n; i++) {
