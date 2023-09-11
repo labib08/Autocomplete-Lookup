@@ -26,6 +26,7 @@ struct cafe {
     int num_of_seats;
     double longitude;
     double latitude;
+    cafe_t * next;
 };
 
 typedef struct radix radix_t;
@@ -52,16 +53,16 @@ void cafeRead(FILE *f, root_t *rootNode);
 cafe_t *createNode();
 void putInNode(cafe_t *new_node, char *lines, int wordCount);
 void createRadixNode(cafe_t *cafe, radix_t *radixNode);
-int getBit(char *trad_name, char *bitArray, int n);
+void getBit(char *trad_name, char *bitArray, int n);
 char *getBinary(char c);
 void insert(root_t *rootNode, radix_t *radixNode);
-int compareBitPrefix(char *incomingBit, char *existingBit, int incomingInt, int existingInt, int *indexIncoming);
+int compareBitPrefix(char *incomingBit, char *existingBit, int *indexIncoming);
 radix_t *createBranchNode();
 void adjustNodeBranch(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexSame);
 void printPreorder(radix_t *root);
 void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming);
-void changePrefixBit(radix_t *incoming, int *indexIncoming);
-int decideBranch(radix_t *incoming, int indexSame);
+void changePrefixBit(char *incomingBit, int *indexIncoming);
+int decideBranch(char *incomingBit, int indexSame);
 void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame);
 int bitToInt(char bit);
 void insertNode(radix_t *parent, radix_t *child, radix_t *branchNode);
@@ -69,20 +70,58 @@ void print2DUtil(radix_t* root, int space);
 void print2D(radix_t* root);
 void cleanupRadixTree(radix_t *root);
 int findIndex(char* bitPrefix, int indexSame, int n);
+int findInteger(char *bitPrefix);
+char **returnQueries(char **queries, int *queryCount, int *initialQuerySize);
+void freeQueries(char **queries, int queryCount);
+int esnureQuerySize(int queryCount, int initialQuerySize);
+void findAndTraverse(radix_t *root, char *query, char *queryBit, int prefixLength, int indexSame,
+                     int charComp, int byteComp, FILE *f);
+int checkMatch(char *prefix, char *query, char *queryBit, int n);
+int findPadding(char *bitPrefix);
+void printOutFile(FILE *f, cafe_t *cafe);
+void storeDuplicates(cafe_t *existingData, cafe_t *incomingData);
 
 int main(int argc, char *argv[]){
+    if (argc < 3){
+        fprintf(stderr, "Usage: %s input_file_name output_file_name\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
     FILE *inFile = fopen(argv[2], "r");
-    assert(inFile);
+    FILE *outFile = fopen(argv[3], "w");
+    assert(inFile && outFile);
     root_t *rootNode = getRoot(inFile);
     printPreorder(rootNode -> head);
     //print2D(rootNode -> head);
     //printf("%p", rootNode->head);
     //printf("Integer == %d\nPrefix == %s\nBit_Prefix == %s\nbranchA == %p\nbranchB == %p\ncafe == %p\n", rootNode->head->integer, rootNode->head->prefix, rootNode->head->bit_prefix, rootNode->head->branchA, rootNode->head->branchB, rootNode->head->data);
-    fclose(inFile);  // Close the input file after reading data
+    int queryCount = 0;
+    char **queries;
+    int initialQuerySize = INIT_SIZE;
+    queries = (char **)malloc(sizeof(char *) * initialQuerySize);
+    assert(queries);
 
+    // Returns the cafes, as an array, that are intended to be searched in the list
+    queries = returnQueries(queries, &queryCount, &initialQuerySize);
+    if (queryCount){
+        for (int i = 0; i < queryCount; i++) {
+            int prefixLength = strlen(queries[i]) + 1;
+            char *queryBit = (char *)malloc((BYTE * prefixLength) + 1); // Allocate enough memory for bits and null terminator
+            assert(queryBit);
+            getBit(queries[i], queryBit, prefixLength);
+            int indexSame = 0;
+            int charComp = 0;
+            int byteComp = 0;
+            findAndTraverse(rootNode -> head, queries[i], queryBit, prefixLength, indexSame, charComp, byteComp, outFile);
+            //printf("----------\n");
+        }
+    }
+
+    fclose(inFile);  // Close the input file after reading data
     // Clean up memory
     cleanupRadixTree(rootNode->head);
     free(rootNode);
+    freeQueries(queries, queryCount);
     return 0;
 }
 
@@ -177,8 +216,7 @@ void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame) {
     radix_t *temp = *head;
 
     //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
-    int isSame = compareBitPrefix(radixNode->bit_prefix, temp->bit_prefix, radixNode->integer, temp->integer,
-                                  &indexSame);
+    int isSame = compareBitPrefix(radixNode->bit_prefix, temp->bit_prefix, &indexSame);
     //printf("%d\n", isSame);
     //printf("%d\n", indexSame);
     //printf("Different Branch: %s = %s and %s= %s\n", radixNode->prefix, radixNode->bit_prefix, temp->prefix, temp->bit_prefix);
@@ -201,24 +239,134 @@ void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame) {
         adjustNodeBranch(radixNode, temp, branchNode, indexSame);
         //printf("BranchNode = %s\n", branchNode->bit_prefix);
     } else {
-        //printf("index1 == %d\n", indexSame);
-        //printf("Same Branch: %s and \n", radixNode->bit_prefix);
-        //printf("Same Branch: %s and %s\n", radixNode->prefix, radixNode->bit_prefix);
-        changePrefixBit(radixNode, &indexSame);
+
+        changePrefixBit(radixNode -> bit_prefix, &indexSame);
+        radixNode -> integer = findInteger(radixNode -> bit_prefix);
         //printf("index2 == %d\n", indexSame);
         //printf("--------\n");
         //printf("Same Branch: %s and %s\n", radixNode->prefix, radixNode->bit_prefix);
-        if (decideBranch(radixNode, indexSame) == RIGHT) {
+
+        if (temp -> prefix && !strcmp(radixNode -> prefix, temp -> prefix)) {
+            storeDuplicates(temp -> data, radixNode -> data);
+        }
+
+         //printf("%d\n", strcmp(radixNode -> prefix, temp -> prefix));
+         else if (decideBranch(radixNode -> bit_prefix, indexSame) == RIGHT) {
             //printf("%s\n", radixNode->bit_prefix);
             insertRecursively(&((*head)->branchB), radixNode, indexSame);
 
         }
-         else if (decideBranch(radixNode, indexSame) == LEFT){
+         else if (decideBranch(radixNode -> bit_prefix, indexSame) == LEFT){
             //printf("%s\n", radixNode->prefix);
             //printf("Same Branch: %s and %s\n", radixNode->prefix, radixNode->bit_prefix);
             insertRecursively(&((*head)->branchA), radixNode, indexSame);
         }
     }
+}
+
+void storeDuplicates(cafe_t *existingData, cafe_t *incomingData){
+    cafe_t *curr = existingData;
+    while (curr -> next){
+        curr = curr -> next;
+    }
+    curr -> next = incomingData;
+}
+
+void findAndTraverse(radix_t *root, char *query, char *queryBit, int prefixLength, int indexSame,
+                        int charComp, int byteComp, FILE *f) {
+    int strComp = 1;
+    if (root == NULL){
+        return;
+    }
+    int isSame = compareBitPrefix(queryBit, root -> bit_prefix, &indexSame);
+    if (isSame){
+        changePrefixBit(queryBit, &indexSame);
+
+        //printf("%d\n", (((root -> integer)/BYTE) + 1));
+
+        //printf("%s == %s\n", query, queryBit);
+        if (root -> prefix && checkMatch(root -> prefix, query, queryBit, prefixLength)){
+            //printf("%s == %s == %s\n",root -> prefix, query, queryBit);
+            //printf("Add = %d\n", prefixLength - 1);
+            byteComp += root -> integer - BYTE;
+            charComp += prefixLength - 1;
+            //printf("Subtract = %d\n",findPadding(root -> bit_prefix) );
+            charComp -= findPadding(root -> bit_prefix);
+            //printf("%s --> b%d c%d s%d\n", query, byteComp, charComp, strComp);
+            fprintf(f, "%s\n", root -> prefix);
+            printOutFile(f, root -> data);
+            return;
+        }
+        else {
+            byteComp += root -> integer;
+            int num = ((root -> integer)/BYTE);
+            //printf("%d\n", root ->integer);
+            //printf("Add = %d\n", (((root -> integer)/BYTE) + 1));
+            if (root->integer % BYTE == 0){
+                //printf("Add = %d\n", num);
+                charComp += num ;
+            }
+            else{
+                num += 1;
+                //printf("Add = %d\n", num);
+                charComp += num ;
+            }
+        }
+        if (decideBranch(queryBit , indexSame) == RIGHT){
+            findAndTraverse(root -> branchB, query, queryBit, prefixLength, indexSame, charComp, byteComp, f);
+        }
+        else if ((decideBranch(queryBit , indexSame) == LEFT)){
+            findAndTraverse(root -> branchA, query, queryBit, prefixLength, indexSame, charComp, byteComp, f);
+        }
+    }
+
+    //printf("%d\n", n);
+    //printf("%s == %s\n", query, queryBit);
+}
+
+void printOutFile(FILE *f, cafe_t *cafe) {
+    fprintf(f, "--> census_year: %d || block_id: %d || property_id: %d"
+        "|| base_property_id: %d || building_address: %s || clue_small_area: %s ||"
+        " business_address: %s || trading_name: %s || industry_code: %d ||"
+        " industry_description: %s || seating_type: %s || number_of_seats: %d ||"
+        " longitude: %.5lf || latitude: %.5lf ||\n", cafe->cen_year,
+        cafe -> block_id, cafe->prop_id, cafe->base_prop_id,
+        cafe->build_add, cafe->clue_small_area, cafe->bus_area,
+        cafe->trad_name, cafe->indus_code, cafe->indus_desc,
+        cafe->seat_type, cafe->num_of_seats, cafe->longitude,
+        cafe->latitude);
+}
+
+int findPadding(char *bitPrefix) {
+    int index = strlen(bitPrefix);
+    int num = 0;
+    for (int i = 0; i < index; i++){
+        if (bitPrefix[i] == PADDING){
+            num ++;
+        }
+    }
+    return num/BYTE;
+}
+
+int findInteger(char *bitPrefix) {
+    int index = strlen(bitPrefix);
+    int integer = 0;
+    for (int i = 0; i< index; i++){
+        if (bitPrefix[i] != PADDING){
+            integer ++;
+        }
+    }
+    return integer;
+}
+int checkMatch(char *prefix, char *query, char *queryBit, int n) {
+    int flag = 1;
+    for (int i =0; i < n; i++) {
+        if (queryBit[i] != PADDING) {
+            flag = 0;
+            break;
+        }
+    }
+    return !strcmp(prefix, query) && flag;
 }
 
 void insertNode(radix_t *parent, radix_t *child, radix_t *branchNode){
@@ -231,8 +379,8 @@ void insertNode(radix_t *parent, radix_t *child, radix_t *branchNode){
     branchNode -> parentBranch = parent;
 }
 
-int decideBranch(radix_t *incoming, int indexSame) {
-    int bitValue = bitToInt(incoming->bit_prefix[indexSame]);
+int decideBranch(char *incomingBit, int indexSame) {
+    int bitValue = bitToInt(incomingBit[indexSame]);
     //printf("%d\n", indexSame);
     if (bitValue == RIGHT){
         return RIGHT;
@@ -256,15 +404,16 @@ void adjustNodeBranch(radix_t *incoming, radix_t *existing, radix_t *branchNode,
     incoming -> parentBranch = existing -> parentBranch = branchNode;
 }
 
-void changePrefixBit(radix_t *incoming, int *indexIncoming){
-    assert(incoming);
+void changePrefixBit(char *incomingBit, int *indexIncoming){
+
     int n = *indexIncoming;
 
    // printf("%d == %s\n", *indexIncoming, incoming->prefix);
     for (int i=0; i< n; i++){
-        incoming -> bit_prefix[i] = PADDING;
+        incomingBit[i] = PADDING;
         *indexIncoming = i + 1;
     }
+
 }
 
 void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branchNode, int indexIncoming) {
@@ -293,10 +442,6 @@ void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branch
         n++;
     }
 
-    branchNode -> integer = n;
-    incoming -> integer -= n;
-    existing -> integer -= n;
-
     while (n != totalIndex){
         binaryString[n] = PADDING;
         n++;
@@ -304,10 +449,13 @@ void changeBranchPrefixBit(radix_t *incoming, radix_t *existing, radix_t *branch
     //printf("%d\n", n);
     binaryString[n] = '\0'; // Null-terminate the string
     branchNode -> bit_prefix = binaryString;
-
+    branchNode -> integer = findInteger(branchNode -> bit_prefix);
+    incoming -> integer = findInteger(incoming -> bit_prefix);
+    existing -> integer = findInteger(existing -> bit_prefix);
 }
 
-int compareBitPrefix(char *incomingBit, char *existingBit, int incomingInt, int existingInt, int *indexIncoming){
+
+int compareBitPrefix(char *incomingBit, char *existingBit, int *indexIncoming){
     int flag = 1;
     int i = 0;
     int totalIndex = strlen(existingBit);
@@ -366,11 +514,11 @@ void createRadixNode(cafe_t *cafe, radix_t *radixNode) {
     int prefix_length = strlen(cafe->trad_name) + 1;
     char *bitArray = (char *)malloc((BYTE * prefix_length) + 1); // Allocate enough memory for bits and null terminator
     assert(bitArray);
-    int n = getBit(cafe->trad_name, bitArray, prefix_length);
+    getBit(cafe->trad_name, bitArray, prefix_length);
 
 
     assert(radixNode);
-    radixNode->integer = n;
+    radixNode->integer = findInteger(bitArray);
     radixNode->prefix = strdup(cafe->trad_name);
     radixNode->bit_prefix = bitArray;
     radixNode->branchA = NULL;
@@ -380,20 +528,16 @@ void createRadixNode(cafe_t *cafe, radix_t *radixNode) {
 
 
 }
-int getBit(char *trad_name, char *bitArray, int n) {
+void getBit(char *trad_name, char *bitArray, int n) {
     assert(bitArray);
     bitArray[0] = '\0';
-    int num = 0;
     for (int i = 0; i < n; i++) {
         char *binary = getBinary(trad_name[i]);
         if (binary) {
             strncat(bitArray, binary, BYTE);
-            num++;
             free(binary);
         }
-
     }
-    return num * BYTE;
 }
 
 char *getBinary(char c) {
@@ -461,6 +605,30 @@ void putInNode(cafe_t *new_node, char *lines, int wordCount){
     }
 }
 
+char **returnQueries(char **queries, int *queryCount, int *initialQuerySize){
+    char query[MAX_CHAR_LEN + 1];
+    assert(queries);
+    int c;
+    // Parses through the query file or stdin until a
+    // newline or End of File is reached
+    while (scanf("%[^\n]", query) == 1){
+        while ((c = getchar()) != '\n' && c != EOF);
+        // Stores the particular queries in an array
+        queries[*queryCount] = strdup(query);
+        (*queryCount)++;
+        // If the number of elements in the query array reaches
+        // the current size, it is going to allocate more memory
+        // for the array
+        if (esnureQuerySize(*queryCount, *initialQuerySize)){
+            *initialQuerySize = *initialQuerySize * 2;
+            queries = realloc(queries, *initialQuerySize * sizeof(char *));
+            assert(queries);
+        }
+    }
+    // Return the queries array
+    return queries;
+}
+
 cafe_t *createNode(){
     // Initialize the node and the sets the parameters to NULL
     cafe_t *node = (cafe_t *)malloc(sizeof(cafe_t));
@@ -471,6 +639,7 @@ cafe_t *createNode(){
     node->trad_name = NULL;
     node->indus_desc = NULL;
     node->seat_type = NULL;
+    node->next = NULL;
     return node;
 }
 
@@ -483,12 +652,28 @@ int bitToInt(char bit) {
         return -1; // Return an error code or default value as needed
     }
 }
+
+int esnureQuerySize(int queryCount, int initialQuerySize) {
+    if (queryCount == initialQuerySize){
+        return 1;
+    }
+    return 0;
+}
+
 void printPreorder(radix_t *root) {
     if (root == NULL)
         return;
 
     // First print data of node
-    printf("Integer == %d\nPrefix == %s\nBit_Prefix == %s\nbranchA == %p\nbranchB == %p\nparentBranch == %p\ncafe == %p\n", root->integer, root->prefix, root->bit_prefix, root->branchA, root->branchB, root ->parentBranch, root->data);
+
+    //printf("Integer == %d\nPrefix == %s\nBit_Prefix == %s\nbranchA == %p\nbranchB == %p\nparentBranch == %p\ncafe == %p\n", root->integer, root->prefix, root->bit_prefix, root->branchA, root->branchB, root ->parentBranch, root->data);
+    if (root -> prefix && root -> data -> next){
+        cafe_t *temp = root -> data;
+        while (temp) {
+            printf("%s == %s\n\n", temp->trad_name, temp->seat_type);
+            temp = temp -> next;
+        }
+    }
     printf("********\n");
     // Then recur on left subtree
     printPreorder(root->branchA);
@@ -562,4 +747,11 @@ void cleanupRadixTree(radix_t *root) {
 
     // Finally, free the current node
     free(root);
+}
+
+void freeQueries(char **queries, int queryCount){
+    for (int i = 0; i < queryCount; i++){
+        free(queries[i]);
+    }
+    free(queries);
 }
