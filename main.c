@@ -91,7 +91,7 @@ int main(int argc, char *argv[]){
     FILE *outFile = fopen(argv[3], "w");
     assert(inFile && outFile);
     root_t *rootNode = getRoot(inFile);
-    printPreorder(rootNode -> head);
+    //printPreorder(rootNode -> head);
     //print2D(rootNode -> head);
     //printf("%p", rootNode->head);
     //printf("Integer == %d\nPrefix == %s\nBit_Prefix == %s\nbranchA == %p\nbranchB == %p\ncafe == %p\n", rootNode->head->integer, rootNode->head->prefix, rootNode->head->bit_prefix, rootNode->head->branchA, rootNode->head->branchB, rootNode->head->data);
@@ -113,11 +113,13 @@ int main(int argc, char *argv[]){
             int charComp = 0;
             int byteComp = 0;
             findAndTraverse(rootNode -> head, queries[i], queryBit, prefixLength, indexSame, charComp, byteComp, outFile);
+            free(queryBit);
             //printf("----------\n");
         }
     }
 
     fclose(inFile);  // Close the input file after reading data
+    fclose(outFile);
     // Clean up memory
     cleanupRadixTree(rootNode->head);
     free(rootNode);
@@ -150,6 +152,7 @@ void cafeRead(FILE *f, root_t *rootNode) {
     size_t len = 0;
     ssize_t read;
     cafe_t *new_node = NULL;
+    radix_t *radixNode = NULL;
     int indicator = 1, wordCount = 0, i = 0, char_index = 0, line_end = 1;
     char line[MAX_CHAR_LEN + 1] = {0};
     char c;
@@ -187,13 +190,14 @@ void cafeRead(FILE *f, root_t *rootNode) {
             }
             i++;
         }
-        radix_t *radixNode = createBranchNode();
+        radixNode = createBranchNode();
         // Appends the filled in node to the linked list
         createRadixNode(new_node, radixNode);
         //printf("%s\n", radixNode -> data -> trad_name);
         insert(rootNode, radixNode);
 
     }
+
     // Frees the line pointer
     free(lines);
 }
@@ -248,6 +252,14 @@ void insertRecursively(radix_t **head, radix_t *radixNode, int indexSame) {
 
         if (temp -> prefix && !strcmp(radixNode -> prefix, temp -> prefix)) {
             storeDuplicates(temp -> data, radixNode -> data);
+            free(radixNode -> bit_prefix);
+            free(radixNode -> prefix);
+            radixNode->data = NULL;
+            radixNode->prefix = NULL;
+            radixNode->bit_prefix = NULL;
+            radixNode -> branchA = NULL;
+            radixNode -> branchB = NULL;
+            free(radixNode);
         }
 
          //printf("%d\n", strcmp(radixNode -> prefix, temp -> prefix));
@@ -292,7 +304,7 @@ void findAndTraverse(radix_t *root, char *query, char *queryBit, int prefixLengt
             charComp += prefixLength - 1;
             //printf("Subtract = %d\n",findPadding(root -> bit_prefix) );
             charComp -= findPadding(root -> bit_prefix);
-            //printf("%s --> b%d c%d s%d\n", query, byteComp, charComp, strComp);
+            printf("%s --> b%d c%d s%d\n", query, byteComp, charComp, strComp);
             fprintf(f, "%s\n", root -> prefix);
             printOutFile(f, root -> data);
             return;
@@ -325,16 +337,21 @@ void findAndTraverse(radix_t *root, char *query, char *queryBit, int prefixLengt
 }
 
 void printOutFile(FILE *f, cafe_t *cafe) {
-    fprintf(f, "--> census_year: %d || block_id: %d || property_id: %d"
+    cafe_t *curr = cafe;
+    while (curr){
+        fprintf(f, "--> census_year: %d || block_id: %d || property_id: %d"
         "|| base_property_id: %d || building_address: %s || clue_small_area: %s ||"
         " business_address: %s || trading_name: %s || industry_code: %d ||"
         " industry_description: %s || seating_type: %s || number_of_seats: %d ||"
-        " longitude: %.5lf || latitude: %.5lf ||\n", cafe->cen_year,
-        cafe -> block_id, cafe->prop_id, cafe->base_prop_id,
-        cafe->build_add, cafe->clue_small_area, cafe->bus_area,
-        cafe->trad_name, cafe->indus_code, cafe->indus_desc,
-        cafe->seat_type, cafe->num_of_seats, cafe->longitude,
-        cafe->latitude);
+        " longitude: %.5lf || latitude: %.5lf ||\n", curr->cen_year,
+        curr -> block_id, curr->prop_id, curr->base_prop_id,
+        curr->build_add, curr->clue_small_area, curr->bus_area,
+        curr->trad_name, curr->indus_code, curr->indus_desc,
+        curr->seat_type, curr->num_of_seats, curr->longitude,
+        curr->latitude);
+        curr = curr -> next;
+    }
+
 }
 
 int findPadding(char *bitPrefix) {
@@ -722,6 +739,20 @@ void cleanupRadixTree(radix_t *root) {
 
     // Free dynamically allocated fields in cafe data
     if (root->data) {
+        cafe_t *curr = root -> data;
+        while (curr){
+            cafe_t *temp = curr;
+            curr = curr->next;
+            free(temp->build_add);
+            free(temp->clue_small_area);
+            free(temp->bus_area);
+            free(temp->trad_name);
+            free(temp->indus_desc);
+            free(temp->seat_type);
+            free(temp);
+
+        }
+        /**
         free(root->data->build_add);
         free(root->data->clue_small_area);
         free(root->data->bus_area);
@@ -729,6 +760,7 @@ void cleanupRadixTree(radix_t *root) {
         free(root->data->indus_desc);
         free(root->data->seat_type);
         free(root->data);
+        */
     }
 
     // Free dynamically allocated fields in radix node
