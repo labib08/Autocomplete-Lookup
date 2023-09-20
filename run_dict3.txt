@@ -1,0 +1,11 @@
+make -B dict3
+
+./dict3 3 dataset_0.csv output.out < test3.in
+
+./dict3 3 tests/dataset_1.csv output.out < tests/test1.in > output.stdout.out
+
+./dict3 3 tests/dataset_2.csv output.out < tests/test2.in > output.stdout.out
+
+./dict3 3 tests/dataset_20.csv output.out < tests/test20.in > output.stdout.out
+
+./dict3 3 tests/dataset_100.csv output.out < tests/test100.in > output.stdout.out
